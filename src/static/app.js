@@ -20,14 +20,70 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Crea la lista dei partecipanti
+        let participantsHTML = "";
+        if (details.participants.length > 0) {
+          participantsHTML = `
+            <div class=\"participants-section\">
+              <strong>Partecipanti iscritti:</strong>
+              <div class=\"participants-list\">
+                ${details.participants.map(email => `
+                  <span class=\"participant-item\" data-activity=\"${name}\" data-email=\"${email}\">
+                    <span class=\"participant-email\">${email}</span>
+                    <span class=\"delete-icon\" title=\"Rimuovi\" style=\"cursor:pointer; color:#c62828; margin-left:8px; font-size:16px;\">&#128465;</span>
+                  </span>
+                `).join("")}
+              </div>
+            </div>
+          `;
+        } else {
+          participantsHTML = `
+            <div class=\"participants-section info\">
+              <em>Nessun partecipante iscritto al momento.</em>
+            </div>
+          `;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHTML}
         `;
 
         activitiesList.appendChild(activityCard);
+
+        // Event listener per delete icon
+        activityCard.querySelectorAll('.delete-icon').forEach(icon => {
+          icon.addEventListener('click', async (e) => {
+            const participantSpan = e.target.closest('.participant-item');
+            const activityName = participantSpan.getAttribute('data-activity');
+            const email = participantSpan.getAttribute('data-email');
+            if (confirm(`Vuoi davvero rimuovere ${email} da \"${activityName}\"?`)) {
+              try {
+                const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, {
+                  method: 'DELETE'
+                });
+                const result = await response.json();
+                if (response.ok) {
+                  messageDiv.textContent = result.message || 'Partecipante rimosso.';
+                  messageDiv.className = 'success';
+                  fetchActivities();
+                } else {
+                  messageDiv.textContent = result.detail || 'Errore nella rimozione.';
+                  messageDiv.className = 'error';
+                }
+                messageDiv.classList.remove('hidden');
+                setTimeout(() => { messageDiv.classList.add('hidden'); }, 4000);
+              } catch (err) {
+                messageDiv.textContent = 'Errore di rete.';
+                messageDiv.className = 'error';
+                messageDiv.classList.remove('hidden');
+              }
+            }
+          });
+        });
 
         // Add option to select dropdown
         const option = document.createElement("option");
@@ -62,6 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // aggiorna la lista attività
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
